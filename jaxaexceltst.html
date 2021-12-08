@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.13.5/xlsx.full.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.13.5/jszip.js"></script>
+<script type="text/javascript">
+    function Upload() {
+        const fileUpload = document.getElementById("fileUpload");
+ 
+        const regex = /^([a-zA-Z0-9\s_\\.\-:])+(.xls|.xlsx)$/;
+        if (regex.test(fileUpload.value.toLowerCase())) {
+            if (typeof (FileReader) != "undefined") {
+                const reader = new FileReader();
+ 
+                if (reader.readAsBinaryString) {
+                    reader.onload = (e) => {
+                        ProcessExcel(e.target.result);
+                    };
+                    reader.readAsBinaryString(fileUpload.files[0]);
+                } else {
+                    reader.onload = (e) => {
+                        let data = "";
+                        const bytes = new Uint8Array(e.target.result);
+                        for (let i = 0; i < bytes.byteLength; i++) {
+                            data += String.fromCharCode(bytes[i]);
+                        }
+                        ProcessExcel(data);
+                    };
+                    reader.readAsArrayBuffer(fileUpload.files[0]);
+                }
+            } else {
+                alert("This browser does not support HTML5.");
+            }
+        } else {
+            alert("Please upload a valid Excel file.");
+        }
+    };
+    async function ProcessExcel(data) {
+        let workbook = XLSX.read(data, {
+            type: 'binary'
+        });
+ 
+        const firstSheet = workbook.SheetNames[0];
+ 
+        const excelRows = XLSX.utils.sheet_to_row_object_array(workbook.Sheets[firstSheet]);
+ 
+        let table = document.createElement("table");
+        table.setAttribute("id","tblData")
+        table.border = "1";
+ 
+        let row = table.insertRow(-1);
+ 
+        let headerCell = document.createElement("TH");
+        headerCell.innerHTML = "Razão";
+        row.appendChild(headerCell);
+
+        headerCell = document.createElement("TH");
+        headerCell.innerHTML = "Rua";
+        row.appendChild(headerCell);
+ 
+        headerCell = document.createElement("TH");
+        headerCell.innerHTML = "Numero";
+        row.appendChild(headerCell);
+
+        headerCell = document.createElement("TH");
+        headerCell.innerHTML = "Latitude";
+        row.appendChild(headerCell);
+
+        headerCell = document.createElement("TH");
+        headerCell.innerHTML = "Longitude";
+        row.appendChild(headerCell);
+ 
+        for (let i = 0; i < excelRows.length; i++) {
+        	
+        	let end = excelRows[i].END
+
+            let num = excelRows[i].NUM
+
+            let ave = excelRows[i].AR
+			
+			let row = table.insertRow(-1);
+        	
+
+    		let cell = row.insertCell(-1);
+            cell.textContent = excelRows[i].RAZ;
+
+    		cell = row.insertCell(-1);
+            cell.textContent = excelRows[i].END;
+
+            cell = row.insertCell(-1);
+            cell.textContent = excelRows[i].NUM;
+        	
+
+          
+            console.log(`${ave} ${end},${num}`); 
+
+      const location = `${ave} ${end},${num}`;
+      const res = await axios.get('https://maps.googleapis.com/maps/api/geocode/json',{
+        params:{
+          address:location,
+          key:'AIzaSyDjzN52rCnLml4Yf7i4RIDGfq837ZzYjsI'
+        }
+      });
+      console.log(res.data)
+      if(res.data.status=="ZERO_RESULTS"){
+      	cell = row.insertCell(-1);
+      cell.textContent ="ERRO! NÃO ENCONTRADO"
+  
+      }
+      else{
+
+
+      const formattedAddress = res.data.results[0].formatted_address;
+      const addressComponents = res.data.results[0].address_components;
+      
+
+      cell = row.insertCell(-1);
+      cell.textContent = lat = res.data.results[0].geometry.location.lat;
+
+      cell = row.insertCell(-1);
+      cell.textContent = lng = res.data.results[0].geometry.location.lng;
+     }
+ 
+        let dvExcel = document.getElementById("dvExcel");
+        dvExcel.textContent = "";
+        dvExcel.appendChild(table);
+    };
+}
+    
+</script>
+</head>
+<body>
+    
+<input type="file" id="fileUpload" />
+<input type="button" id="upload" value="Upload" onclick="Upload()" />
+<button>Exportar para .CSV</button>
+<script>
+
+function download_csv(csv, filename) {
+    let csvFile;
+    let downloadLink;
+
+    csvFile = new Blob([csv], {type: "text/csv"});
+
+    downloadLink = document.createElement("a");
+
+    downloadLink.download = filename;
+
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+
+    downloadLink.style.display = "none";
+
+    document.body.appendChild(downloadLink);
+
+    downloadLink.click();
+}
+
+function export_table_to_csv(html, filename) {
+	let csv = [];
+	let rows = document.querySelectorAll("table tr");
+	
+    for (let i = 0; i < rows.length; i++) {
+		let row = [], cols = rows[i].querySelectorAll("td, th");
+		
+        for (let j = 0; j < cols.length; j++) 
+            row.push(cols[j].innerText);
+        
+		csv.push(row.join(","));		
+	}
+
+    download_csv(csv.join("\n"), filename);
+}
+
+document.querySelector("button").addEventListener("click", function () {
+    let html = document.querySelector("table").outerHTML;
+	export_table_to_csv(html, "table.csv");
+});
+
+</script>
+<hr />
+<div id="dvExcel"></div>
+</body>
+</html>
